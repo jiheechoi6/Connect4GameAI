@@ -76,7 +76,7 @@ class Game:
 
     '''returns column number - the best move'''
     def pick_best_move(self, player: int) -> int:
-        return self.minimax(self._board, 4, True)[1]
+        return self.minimax(self._board, 3, True)[1]
 
     def get_available_col(self) -> List[int]:
         available = []
