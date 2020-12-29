@@ -75,8 +75,8 @@ class Game:
         return -1
 
     '''returns column number - the best move'''
-    def pick_best_move(self, player: int) -> int:
-        return self.minimax(self._board, 3, True)[1]
+    def pick_best_move(self) -> int:
+        return self.minimax(self._board, 4, -math.inf, math.inf, True)[1]
 
     def get_available_col(self) -> List[int]:
         available = []
@@ -126,48 +126,63 @@ class Game:
             score += 5
 
         opponent = (player % 2)+1
-        if window.count(opponent) == 3 and window.count(0) == 1:
-            score -= 800
+        if window.count(player) == 4:
+            score -= 1000
+        elif window.count(opponent) == 3 and window.count(0) == 1:
+            score -= 10
+        elif window.count(player) == 2 and window.count(0) == 2:
+            score -= 5
 
         return score
 
     '''minimax algorithm'''
-    def minimax(self, board:List[List[int]], depth:int, maximizing_player:bool):
+    def minimax(self, board:List[List[int]], depth:int, alpha, beta, maximizing_player:bool):
         valid_locations = self.get_available_col()  # children nodes
 
         # Heuristic value of node
         if depth == 0:
-            return self.position_score(board, 2), None
+            return self.position_score(board, 2), None, depth
         if self.is_terminal_node(board):
             if self.is_there_winner() == 1:
-                return 10000000000000, None
+                return 10000000000000, None, depth
             elif self.is_there_winner() == 2:
-                return -10000000000000, None
+                return -10000000000000, None, depth
             else:  # no more moves possible
                 return 0, None
         if maximizing_player:
+            min_depth = depth
             max_value = -math.inf
             best_col = random.choice(valid_locations)
             for col in valid_locations:
                 row = self.get_available_row(board, col)
                 temp_board = board.copy()
                 temp_board[row][col] = 2
-                new_score = self.minimax(temp_board, depth-1, False)[0]
-                if max_value < new_score:
+                new_score = self.minimax(temp_board, depth-1, alpha, beta, False)[0]
+                new_depth = self.minimax(temp_board, depth-1, alpha, beta, False)[2]
+                if max_value < new_score or (max_value == new_score and min_depth < new_depth):
                     max_value = new_score
                     best_col = col
-            return max_value, best_col
+                    min_depth = new_depth
+
+                alpha = max(max_value, alpha)
+                if alpha >= beta:
+                    break
+            return max_value, best_col, depth
         else:  # minimizing player
             min_value = math.inf
             for col in valid_locations:
                 row = self.get_available_row(board, col)
                 temp_board = board.copy()
                 temp_board[row][col] = 1
-                new_score = self.minimax(temp_board, depth-1, False)[0]
+                new_score = self.minimax(temp_board, depth-1, alpha, beta, False)[0]
                 if min_value > new_score:
                     min_value = new_score
                     best_col = col
-            return min_value, best_col
+
+                beta = min(min_value, beta)
+                if alpha >= beta:
+                    break
+            return min_value, best_col, depth
 
     '''used for minimax method. Tells whether the game is over
     Game is over when there are no more columns to drop a piece in or if there 
