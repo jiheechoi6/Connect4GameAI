@@ -18,8 +18,10 @@ class Game:
     def get_board(self) -> List[List[int]]:
         return self._board
 
-    def is_location_valid(self, col: int) -> bool:
-        return self._board[0][col] == 0
+    def is_location_valid(self, col: int, board: List[List[int]]) -> bool:
+        if board is None:
+            board = self._board
+        return board[0][col] == 0
 
     def make_move(self, row: int, col: int, player: int) -> List[List[int]]:
         self._board[row][col] = player
@@ -44,29 +46,29 @@ class Game:
 
         # horizontal
         for row in range(self._row):
-            row_array = list(self._board[row])
+            row_array = list(board[row])
             for col in range(0, self._col-3):
                 window = row_array[col: col+4]
-                if window.count(1)==4:
+                if window.count(1) == 4:
                     return 1
-                if window.count(2)==4:
+                if window.count(2) == 4:
                     return 2
 
         # vertical
         for col in range(self._col):
-            col_array = [int(i) for i in list(self._board[:, col])]
+            col_array = [int(i) for i in list(board[:, col])]
             for row in range(self._row-3):
                 window = col_array[row: row+4]
-                if window.count(1)==4:
+                if window.count(1) == 4:
                     return 1
-                if window.count(2)==4:
+                if window.count(2) == 4:
                     return 2
 
         # diagonal
         for row in range(self._row-3):
             for col in range(self._col-3):
-                window1 = [self._board[row+i][col+i] for i in range(4)]
-                window2 = [self._board[row+3-i][col+i] for i in range(4)]
+                window1 = [board[row+i][col+i] for i in range(4)]
+                window2 = [board[row+3-i][col+i] for i in range(4)]
                 if window1.count(1) == 4 or window2.count(1) == 4:
                     return 1
                 if window1.count(2) == 4 or window2.count(2) == 4:
@@ -76,12 +78,14 @@ class Game:
 
     '''returns column number - the best move'''
     def pick_best_move(self) -> int:
-        return self.minimax(self._board, 4, -math.inf, math.inf, True)[1]
+        return self.minimax(self._board, 5, -math.inf, math.inf, True)[1]
 
-    def get_available_col(self) -> List[int]:
+    def get_available_col(self, board: List[List[int]]) -> List[int]:
+        if board is None:
+            board = self._board
         available = []
         for col in range(self._col):
-            if self.is_location_valid(col):
+            if self.is_location_valid(col, board):
                 available.append(col)
         return available
 
@@ -118,39 +122,35 @@ class Game:
 
     def score_calculator(self, window: List[int], player: int) -> int:
         score = 0
-        if window.count(player) == 4:
-            score += 1000
-        elif window.count(player) == 3 and window.count(0) == 1:
+        if window.count(player) == 3 and window.count(0) == 1:
             score += 10
         elif window.count(player) == 2 and window.count(0) == 2:
             score += 5
 
         opponent = (player % 2)+1
-        if window.count(player) == 4:
-            score -= 1000
-        elif window.count(opponent) == 3 and window.count(0) == 1:
+        if window.count(opponent) == 3 and window.count(0) == 1:
             score -= 10
-        elif window.count(player) == 2 and window.count(0) == 2:
+        elif window.count(opponent) == 2 and window.count(0) == 2:
             score -= 5
 
         return score
 
     '''minimax algorithm'''
-    def minimax(self, board:List[List[int]], depth:int, alpha, beta, maximizing_player:bool):
-        valid_locations = self.get_available_col()  # children nodes
+    def minimax(self, board: List[List[int]], depth:int, alpha, beta, maximizing_player:bool):
+        valid_locations = self.get_available_col(board)  # children nodes
 
         # Heuristic value of node
         if depth == 0:
             return self.position_score(board, 2), None, depth
+        wtf = self.is_terminal_node(board)
         if self.is_terminal_node(board):
-            if self.is_there_winner() == 1:
-                return 10000000000000, None, depth
-            elif self.is_there_winner() == 2:
-                return -10000000000000, None, depth
+            if self.is_there_winner(board) == 2:  # AI wins
+                return 10000000000000, None
+            elif self.is_there_winner(board) == 1:  # player wins
+                return -100000000000000, None
             else:  # no more moves possible
                 return 0, None
         if maximizing_player:
-            min_depth = depth
             max_value = -math.inf
             best_col = random.choice(valid_locations)
             for col in valid_locations:
@@ -158,23 +158,21 @@ class Game:
                 temp_board = board.copy()
                 temp_board[row][col] = 2
                 new_score = self.minimax(temp_board, depth-1, alpha, beta, False)[0]
-                new_depth = self.minimax(temp_board, depth-1, alpha, beta, False)[2]
-                if max_value < new_score or (max_value == new_score and min_depth < new_depth):
+                if max_value < new_score:
                     max_value = new_score
                     best_col = col
-                    min_depth = new_depth
 
                 alpha = max(max_value, alpha)
                 if alpha >= beta:
                     break
-            return max_value, best_col, depth
+            return max_value, best_col
         else:  # minimizing player
             min_value = math.inf
             for col in valid_locations:
                 row = self.get_available_row(board, col)
                 temp_board = board.copy()
                 temp_board[row][col] = 1
-                new_score = self.minimax(temp_board, depth-1, alpha, beta, False)[0]
+                new_score = self.minimax(temp_board, depth-1, alpha, beta, True)[0]
                 if min_value > new_score:
                     min_value = new_score
                     best_col = col
@@ -182,11 +180,12 @@ class Game:
                 beta = min(min_value, beta)
                 if alpha >= beta:
                     break
-            return min_value, best_col, depth
+            return min_value, best_col
 
     '''used for minimax method. Tells whether the game is over
     Game is over when there are no more columns to drop a piece in or if there 
     is a winner
     @return whether the game is over'''
     def is_terminal_node(self, board: List[List[int]]):
-        return len(self.get_available_col()) == 0 or self.is_there_winner(board) != -1
+        winner = self.is_there_winner(board)
+        return len(self.get_available_col(board)) == 0 or winner!= -1
